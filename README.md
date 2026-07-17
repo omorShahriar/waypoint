@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/waypoint-logo.svg" alt="Waypoint - durable agent workflows" width="720">
+</p>
+
 # Waypoint
 
 Waypoint turns an approved plan into local, resumable work that survives fresh agent sessions.
