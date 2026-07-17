@@ -1,0 +1,25 @@
+{
+  "plan": "docs/plans/example.md",
+  "milestone": "example-milestone",
+  "issues": [
+    {
+      "id": "S0",
+      "title": "Deliver the first complete outcome",
+      "priority": "active",
+      "depends_on": [],
+      "unlocks": ["S1"],
+      "affected_repos": ["root"],
+      "outcome": "Describe the independently verifiable result.",
+      "context": [
+        "Approved plan: docs/plans/example.md",
+        "Inherited invariant: unknown evidence fails closed."
+      ],
+      "what_to_build": "Describe end-to-end behavior without splitting by technical layer.",
+      "acceptance_criteria": [
+        "The complete outcome is independently verifiable.",
+        "Failure and unknown states fail closed."
+      ],
+      "next_action": "Inspect current code paths and move the issue to ready"
+    }
+  ]
+}

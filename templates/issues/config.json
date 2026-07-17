@@ -1,0 +1,5 @@
+{
+  "max_in_progress": 1,
+  "active_priorities": ["active"],
+  "done_statuses": ["done"]
+}
