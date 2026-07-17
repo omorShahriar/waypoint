@@ -319,3 +319,5 @@ Waypoint is available under the [MIT License](LICENSE).
 
 - [Vercel Agent Skills](https://vercel.com/docs/agent-resources/skills)
 - [Skills CLI](https://github.com/vercel-labs/skills)
+- [Lavish Editor](https://github.com/kunchenguid/lavish-axi)
+- [grill-me skill](https://github.com/mattpocock/skills/blob/main/skills/productivity/grill-me/SKILL.md)
