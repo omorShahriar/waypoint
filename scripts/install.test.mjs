@@ -60,11 +60,21 @@ test("installs and verifies a clean project idempotently", async () => {
     assert.equal(harness(root, "transition", "S0", "ready", "--note", "Ready").status, 0);
     assert.equal(harness(root, "transition", "S0", "in_progress", "--next-action", "Implement", "--note", "Started").status, 0);
     assert.equal(harness(root, "checkpoint", "S0", "--active-step", "Halfway", "--next-action", "Ask for approval", "--note", "Checkpointed").status, 0);
+    // Synthetic inputs prove unsafe credential prompts and values fail before persistence.
+    const secretRequest = harness(root, "request-human", "S0", "--request-id", "credential-1", "--question", "Paste the API token", "--reason", "Deployment requires setup", "--expected-response", "The API token value", "--resume-condition", "Credentials configured");
+    assert.notEqual(secretRequest.status, 0);
+    assert.match(secretRequest.stderr, /must not ask for a secret value/);
     assert.equal(harness(root, "request-human", "S0", "--request-id", "approval-1", "--question", "Approve?", "--reason", "Human approval required", "--expected-response", "yes or changes", "--resume-condition", "Approval recorded").status, 0);
     const illegalResume = harness(root, "transition", "S0", "in_progress", "--next-action", "Continue");
     assert.notEqual(illegalResume.status, 0);
     assert.match(illegalResume.stderr, /resume-human/);
-    assert.equal(harness(root, "resume-human", "S0", "--response", "Approved", "--responded-by", "tester", "--next-action", "Continue implementation").status, 0);
+    const secretResponse = harness(root, "resume-human", "S0", "--response-summary", "token=EXAMPLE_ONLY_NOT_A_SECRET", "--responded-by", "tester", "--next-action", "Continue implementation");
+    assert.notEqual(secretResponse.status, 0);
+    assert.match(secretResponse.stderr, /appears to contain a secret value/);
+    assert.equal(harness(root, "resume-human", "S0", "--response-summary", "Approved", "--responded-by", "tester", "--next-action", "Continue implementation").status, 0);
+    const issue = await readFile(join(root, "issues/S0-deliver-one-complete-outcome.md"), "utf8");
+    assert.match(issue, /"summary":"Approved"/);
+    assert.doesNotMatch(issue, /EXAMPLE_ONLY_NOT_A_SECRET/);
     const status = harness(root, "status");
     assert.equal(status.status, 0, status.stderr);
     assert.match(status.stdout, /in_progress/);

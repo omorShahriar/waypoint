@@ -33,6 +33,37 @@ const REQUIRED_SECTIONS = [
   "Outcome", "Context", "What to build", "Acceptance criteria", "Blocked by",
   "Decisions", "Implementation log", "Verification", "Handoff",
 ];
+const SECRET_VALUE_PATTERNS = [
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+  /\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{12,}\b/i,
+  /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/,
+  /\b(?:AKIA[0-9A-Z]{16}|github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{12,}|sk-[A-Za-z0-9_-]{16,})\b/,
+  /\b(?:password|passwd|secret|token|api[_ -]?key|access[_ -]?key|private[_ -]?key|connection[_ -]?string)\s*[:=]\s*["']?[^\s"']{8,}/i,
+];
+const SECRET_SOLICITATION = /\b(?:paste|provide|send|share|enter|supply|return|record|include|give)\b[^.\n]{0,80}\b(?:password|passwd|secret|token|api[ _-]?key|access[ _-]?key|private[ _-]?key|connection string)\b/i;
+
+function hasSecretValue(value) {
+  return SECRET_VALUE_PATTERNS.some((pattern) => pattern.test(String(value)));
+}
+
+function solicitsSecret(question, expectedResponse) {
+  return SECRET_SOLICITATION.test(`${question}\n${expectedResponse}`);
+}
+
+function assertNoSecretValue(value, field) {
+  if (hasSecretValue(value)) {
+    throw new Error(`${field} appears to contain a secret value; remove it, rotate it if real, and record only a non-sensitive summary`);
+  }
+}
+
+function assertSafeHumanRequest(opts) {
+  for (const field of ["question", "reason", "expected_response", "resume_condition"]) {
+    assertNoSecretValue(opts[field], `--${field.replaceAll("_", "-")}`);
+  }
+  if (solicitsSecret(opts.question, opts.expected_response)) {
+    throw new Error("request-human must not ask for a secret value; request out-of-band setup and a non-sensitive confirmation instead");
+  }
+}
 
 export function parseIssue(content, filename = "<memory>") {
   const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
@@ -99,15 +130,22 @@ export function validateIssues(issues, config = { max_in_progress: 1 }) {
     if (meta.status === "awaiting_human") {
       const required = ["request_id", "question", "reason", "expected_response", "requested_at", "resume_condition"];
       if (!meta.human_request || typeof meta.human_request !== "object") errors.push(`${filename}: awaiting_human requires human_request`);
-      else for (const field of required) if (!meta.human_request[field]) errors.push(`${filename}: human_request missing ${field}`);
+      else {
+        for (const field of required) if (!meta.human_request[field]) errors.push(`${filename}: human_request missing ${field}`);
+        for (const field of ["question", "reason", "expected_response", "resume_condition"]) {
+          if (hasSecretValue(meta.human_request[field])) errors.push(`${filename}: human_request ${field} appears to contain a secret value`);
+        }
+        if (solicitsSecret(meta.human_request.question, meta.human_request.expected_response)) errors.push(`${filename}: human_request must not ask for a secret value`);
+      }
       if (meta.human_response !== null) errors.push(`${filename}: awaiting_human cannot have human_response`);
     }
     if (meta.human_response !== null) {
-      const required = ["request_id", "response", "responded_by", "responded_at"];
+      const required = ["request_id", "summary", "responded_by", "responded_at"];
       if (!meta.human_response || typeof meta.human_response !== "object") errors.push(`${filename}: human_response must be an object or null`);
       else {
         for (const field of required) if (!meta.human_response[field]) errors.push(`${filename}: human_response missing ${field}`);
         if (meta.human_request?.request_id !== meta.human_response.request_id) errors.push(`${filename}: human response does not match request`);
+        if (hasSecretValue(meta.human_response.summary)) errors.push(`${filename}: human_response summary appears to contain a secret value`);
       }
     }
     if (meta.status === "done") {
@@ -327,6 +365,7 @@ async function checkpoint(id, args) {
 async function requestHuman(id, args) {
   const opts = options(args);
   requireOptions(opts, ["request_id", "question", "reason", "expected_response", "resume_condition"], "request-human");
+  assertSafeHumanRequest(opts);
   const [issues, config] = await Promise.all([loadIssues(), loadConfig()]);
   const issue = assertTransition(issues, id, "awaiting_human");
   const now = new Date().toISOString();
@@ -347,22 +386,23 @@ async function requestHuman(id, args) {
 
 async function resumeHuman(id, args) {
   const opts = options(args);
-  requireOptions(opts, ["response", "responded_by", "next_action"], "resume-human");
+  requireOptions(opts, ["response_summary", "responded_by", "next_action"], "resume-human");
+  assertNoSecretValue(opts.response_summary, "--response-summary");
   const [issues, config] = await Promise.all([loadIssues(), loadConfig()]);
   const issue = assertTransition(issues, id, "in_progress", { nextAction: opts.next_action });
   if (!issue.metadata.human_request) throw new Error(`${id}: no human request to resume`);
   const now = new Date().toISOString();
   issue.metadata.human_response = {
-    request_id: issue.metadata.human_request.request_id, response: opts.response,
+    request_id: issue.metadata.human_request.request_id, summary: opts.response_summary,
     responded_by: opts.responded_by, responded_at: now,
   };
   issue.metadata.status = "in_progress";
   issue.metadata.last_updated = now;
-  issue.metadata.active_step = "Resumed after human response";
+  issue.metadata.active_step = "Resumed after human response summary";
   issue.metadata.next_action = opts.next_action;
-  issue.body = appendSection(issue.body, "Implementation log", `- ${now}: Human response recorded for ${issue.metadata.human_request.request_id} by ${opts.responded_by}`);
+  issue.body = appendSection(issue.body, "Implementation log", `- ${now}: Non-sensitive human response summary recorded for ${issue.metadata.human_request.request_id} by ${opts.responded_by}`);
   await persistIssue(issue, issues, config);
-  console.log(`${id}: in_progress after human response`);
+  console.log(`${id}: in_progress after human response summary`);
 }
 
 async function transition(id, next, args) {

@@ -86,6 +86,27 @@ test("validates structured human wait state", () => {
   assert.ok(validateIssues([waiting]).some((error) => error.includes("human_request")));
 });
 
+test("requires a non-sensitive human response summary", () => {
+  const resumed = makeIssue({ status: "in_progress" });
+  resumed.metadata.human_request = {
+    request_id: "approval-1",
+    question: "Approve the design?",
+    reason: "Subjective review is required",
+    expected_response: "Approve or request changes",
+    requested_at: "2026-07-18T00:00:00.000Z",
+    resume_condition: "A clear approval decision is recorded",
+  };
+  resumed.metadata.human_response = {
+    request_id: "approval-1",
+    summary: "Approved",
+    responded_by: "reviewer",
+    responded_at: "2026-07-18T01:00:00.000Z",
+  };
+  assert.deepEqual(validateIssues([resumed]), []);
+  delete resumed.metadata.human_response.summary;
+  assert.ok(validateIssues([resumed]).some((error) => error.includes("human_response missing summary")));
+});
+
 test("detects cycles and active limit", () => {
   const a = makeIssue({ id: "A", status: "in_progress", dependencies: ["B"] });
   const b = makeIssue({ id: "B", status: "in_progress", dependencies: ["A"] });
