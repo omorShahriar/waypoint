@@ -70,6 +70,8 @@ Do not start when dependencies, acceptance, or product decisions are ambiguous. 
 - Record follow-up work without silently expanding scope.
 - Keep active step and next action current.
 - Treat unknown evidence as blocking, never empty success.
+- Never request, receive, repeat, display, pass as a command argument, or persist secret values.
+- For credential setup, require the human to act outside the agent context and record only a non-sensitive completion confirmation or reference.
 
 ## Session Close
 
@@ -89,8 +91,8 @@ node scripts/waypoint.mjs sync
 node scripts/waypoint.mjs status
 node scripts/waypoint.mjs create-from-plan issues/plan-issues.json
 node scripts/waypoint.mjs checkpoint <ID> --active-step "..." --next-action "..." --note "..."
-node scripts/waypoint.mjs request-human <ID> --request-id "..." --question "..." --reason "..." --expected-response "..." --resume-condition "..."
-node scripts/waypoint.mjs resume-human <ID> --response "..." --responded-by "..." --next-action "..."
+node scripts/waypoint.mjs request-human <ID> --request-id "..." --question "..." --reason "..." --expected-response "<non-sensitive response; never a secret>" --resume-condition "..."
+node scripts/waypoint.mjs resume-human <ID> --response-summary "<non-sensitive summary>" --responded-by "..." --next-action "..."
 node scripts/waypoint.mjs transition <ID> in_progress \
   --next-action "Implement the next accepted vertical path" \
   --note "Session started after dependency review"

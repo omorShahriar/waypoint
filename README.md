@@ -43,7 +43,9 @@ Example prompt:
 
 ### Pause safely for human input
 
-Issues are autonomous by default. When the agent reaches a decision, approval, credential action, external setup, or subjective review that only a human can provide, it enters `awaiting_human`, records one precise request, and halts. The human response is recorded before work resumes.
+Issues are autonomous by default. When the agent reaches a decision, approval, secure credential setup, external setup, or subjective review that only a human can provide, it enters `awaiting_human`, records one precise request, and halts. Credential setup happens entirely outside the agent context in a provider UI, environment configuration, or secret manager. Waypoint records only a non-sensitive decision or completion summary before work resumes.
+
+Waypoint must never request, receive, repeat, display, pass as a command argument, or persist passwords, API keys, access tokens, private keys, connection strings, or other secret values. If a secret is exposed, do not record it in Waypoint and rotate it immediately.
 
 Example prompts:
 
@@ -208,7 +210,7 @@ Each issue records:
 - implementation decisions and activity;
 - verification evidence;
 - current step and exact next action;
-- structured human request and response;
+- structured human request and non-sensitive response summary;
 - fresh-session handoff.
 
 ### Safety guards
@@ -219,6 +221,14 @@ Each issue records:
 - Completion requires checked criteria and evidence.
 - Generated dashboard state cannot drift silently from issue files.
 - Conflicting installer files are not overwritten without explicit `--force` approval.
+
+### Runtime security boundaries
+
+- The packaged runtime has no third-party dependencies and makes no network requests.
+- The installer previews changes with `--dry-run`, copies only bundled files, and refuses conflicting writes unless the user explicitly approves `--force`.
+- Runtime subprocesses use the current Node.js executable with fixed local script paths and do not invoke a shell.
+- Human requests that solicit secret values are rejected, and recognizable credential material is rejected before issue state is written.
+- Waypoint state is ordinary project Markdown and JSON intended for source review; it is not a credential store.
 
 ## Useful Commands
 
@@ -248,12 +258,12 @@ node scripts/waypoint.mjs request-human S0 \
   --request-id "identity-provider" \
   --question "Which company OIDC provider should production use?" \
   --reason "Deployment configuration depends on this decision" \
-  --expected-response "Provider name and tenant constraints" \
+  --expected-response "Non-sensitive provider name and tenant constraints" \
   --resume-condition "A production OIDC provider is selected"
 
-# Record the answer and resume
+# Record a non-sensitive summary and resume
 node scripts/waypoint.mjs resume-human S0 \
-  --response "Use the company Entra tenant" \
+  --response-summary "Use the company Entra tenant" \
   --responded-by "project owner" \
   --next-action "Finalize the OIDC deployment contract"
 ```

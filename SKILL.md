@@ -189,10 +189,14 @@ Update the handoff with the owner/decision needed. Do not use `blocked` for ordi
 
 ## Mode: Request Human
 
-Use only when the agent cannot safely proceed without a human decision, approval, credential action, external setup, or subjective review.
+Use only when the agent cannot safely proceed without a human decision, approval, secure credential setup performed outside the agent context, external setup, or subjective review.
+
+### Credential Safety
+
+Never request, receive, repeat, display, pass as a command argument, or persist passwords, API keys, access tokens, private keys, connection strings, or other secret values. For credential setup, ask the human to perform the action in the provider UI, environment configuration, or secret manager and return only a non-sensitive completion confirmation or reference. If a secret is provided, do not run a Waypoint command with it; tell the user to rotate the exposed value.
 
 1. Checkpoint completed work and verification first.
-2. Ask one precise question or action request with an explicit expected response and resume condition.
+2. Ask one precise question or action request with an explicit non-sensitive expected response and resume condition.
 3. Transition and halt:
 
 ```bash
@@ -200,7 +204,7 @@ node scripts/waypoint.mjs request-human <ID> \
   --request-id "<stable request id>" \
   --question "<one precise question or action>" \
   --reason "<why the agent cannot proceed autonomously>" \
-  --expected-response "<what the human must provide>" \
+  --expected-response "<non-sensitive decision or completion confirmation; never a secret>" \
   --resume-condition "<objective condition for resuming>"
 ```
 
@@ -209,11 +213,11 @@ node scripts/waypoint.mjs request-human <ID> \
 ## Mode: Resume Human
 
 1. Confirm the issue is `awaiting_human` and feedback satisfies the recorded resume condition.
-2. Record the response and continue:
+2. Record a non-sensitive summary of the response or completed action. Never quote raw credentials or other secret values:
 
 ```bash
 node scripts/waypoint.mjs resume-human <ID> \
-  --response "<human response or completed action>" \
+  --response-summary "<non-sensitive decision or completion confirmation>" \
   --responded-by "<human identity or user>" \
   --next-action "<first executable action after feedback>"
 ```
